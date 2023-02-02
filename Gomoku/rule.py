@@ -15,14 +15,23 @@ class Rule:
     @classmethod
     def play(cls, board: Board, action) -> bool: ...
 
+    # action is a tuple (a, b, c)
+    # a,b > 0 and c == 0/1: player 0/1 puts piece at (a, b)
+    # a,b == -1 and c == 0/1: player 0/1 concedes defeat
+    # (a, b, c) == (-2, -2, c): 
+    #   c == -2: start the game
+    #   c == 0/1: end the game, and winner is player 0/1
+
 class NoForbidden(Rule):
     @classmethod
     def judge(cls, board: Board, action) -> bool:
         try:
+            if action == (-2, -2, -2):  return True
+
+            if action[2] != board.turn:  return False
             if action[0] == -1 and action[1] == -1:  return True
             if action[0] >= 0 and action[1] >= 0 and\
               action[0] < board.row and action[1] < board.col and\
-              (action[2] == 0 or action[2] == 1) and\
               board[action[0]][action[1]] == -1:
                 return True
             return False
@@ -105,6 +114,7 @@ class NoForbidden(Rule):
     @classmethod
     def play(cls, board: Board, action) -> bool:
         if cls.judge(board, action): 
+            board.turn ^= 1
             if action[0] == -1 and action[1] == -1:
                 board.win = action[2]^1
             board[action[0]][action[1]] = action[2]

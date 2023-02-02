@@ -29,9 +29,9 @@ class MyThread(threading.Thread):
 
 class GomokuUI:
     def __init__(self, player0:Player, player1:Player, \
-        rule=NoForbidden, board: Board = Board(), turn = 0) -> None:
+        rule=NoForbidden, board: Board = Board()) -> None:
         os.chdir(os.path.dirname(__file__))
-        self.gomoku = Gomoku(player0, player1, rule, board, turn)
+        self.gomoku = Gomoku(player0, player1, rule, board)
         self.mode = 'set_board'
         self.result = -1
         
@@ -107,7 +107,7 @@ class GomokuUI:
         # self.current_piece_canvas.bind("<Button-1>", self.current_piece_canvas_click_event)
         self.current_piece_canvas.grid(row = 0, column = 1)
         self.current_piece = self.current_piece_canvas.create_image(10, 10, anchor='nw',\
-            image=(self.black_img, self.white_img)[self.gomoku.turn])
+            image=(self.black_img, self.white_img)[self.gomoku.board.turn])
 
         button_font = ('楷体', 12)
         self.start_button = tk.Button(self.root, text='开始游戏', font=button_font, \
@@ -175,7 +175,7 @@ class GomokuUI:
 
     def concede(self):
         if self.mode == 'play':
-            player = self.gomoku.player[self.gomoku.turn]
+            player = self.gomoku.player[self.gomoku.board.turn]
             if isinstance(player, Person):
                 player.que.put((-1, -1))
 
@@ -193,28 +193,23 @@ class GomokuUI:
     def refresh_current_piece(self):
         self.current_piece_canvas.delete(self.current_piece)
         self.current_piece = self.current_piece_canvas.create_image(10, 10, anchor='nw',\
-            image=(self.black_img, self.white_img)[self.gomoku.turn])
+            image=(self.black_img, self.white_img)[self.gomoku.board.turn])
 
     def board_click_event(self, event):
-        # if self.turn == False:  return
         y = floor((event.x-self.board_st[0]+self.piece_sz/2) / self.piece_sz)
         x = floor((event.y-self.board_st[1]+self.piece_sz/2) / self.piece_sz)
         if x < 0 or y < 0 or x >= self.gomoku.board.row or y >= self.gomoku.board.col: 
             return
         if self.mode == 'set_board':
             if self.gomoku.board[x][y] != -1:  return
-            self.gomoku.board[x][y] = self.gomoku.turn
-            self.draw_piece(x, y, self.gomoku.turn)
-            self.gomoku.turn ^= 1
+            self.gomoku.board[x][y] = self.gomoku.board.turn
+            self.draw_piece(x, y, self.gomoku.board.turn)
+            self.gomoku.board.turn ^= 1
             self.refresh_current_piece()
         elif self.mode == 'play':
-            player = self.gomoku.player[self.gomoku.turn]
+            player = self.gomoku.player[self.gomoku.board.turn]
             if isinstance(player, Person):
                 player.que.put((x, y))
-        # if self.gomoku.board[x][y] != -1:  return
-        # self.action = (x, y, self.mycolor)
-        # self.draw_piece(x, y, self.mycolor)
-        # self.turn = True
 
     def board_right_click_event(self, event):
         y = floor((event.x-self.board_st[0]+self.piece_sz/2) / self.piece_sz)
@@ -260,5 +255,5 @@ if __name__ == '__main__':
     # board[7][7] = 0
     # board[6][7] = 1
     p0, p1 = Person('Alice'), Person('Bob')
-    g = GomokuUI(p0, p1, NoForbidden, board, 0)
+    g = GomokuUI(p0, p1, NoForbidden, board)
     g.draw_ui()
