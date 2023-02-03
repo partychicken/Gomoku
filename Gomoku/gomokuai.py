@@ -3,6 +3,7 @@ from math import sqrt
 from rule import NoForbidden
 from board import Board
 from player import Player
+from rule import NoForbidden
 import torch
 from torch import nn
 from torchvision import models
@@ -26,23 +27,31 @@ class MCTS_node():
         self.legal  = [] # 所有能落子的位置，是一维tensor，用0/1表示
         self.p_real = [] # 去除p中不能落子位置的概率分布再乘上c_puct，是一维tensor
         self.nodes  = {} # 子结点字典，用下一次落子的坐标x*15+y作为key
+        self.final  = False # 是否终局
 
-    def expand(self, board:Board, policynet:nn.Module, valuenet:nn.Module, self_play):
+    def expand(self, board:Board, policynet:nn.Module, valuenet:nn.Module, self_play\
+        , lst_action = (-2, -2, -2)):
         state = gomokunet.board_to_tensor(board)
         self.n  = 1
         self.p  = policynet(state)
         self.q  = self.v = valuenet(state).item()
-        self.nn = torch.ones(Env.board_sz, device=Env.device)
-        self.qn = torch.zeros(Env.board_sz, device=Env.device)
-        self.p_real = self.p.clone().detach().squeeze_(0)
-        self.legal  = torch.ones(Env.board_sz)
-        for i in range(0, Env.board_shape[0]):
-            for j in range(0, Env.board_shape[1]):
-                if board[i][j] != -1:
-                    self.legal[i*Env.board_shape[0]+j] = 0
-                    self.p_real[i*Env.board_shape[0]+j] = 0
-                else: self.nodes[i*Env.board_shape[0]+j] = MCTS_node()
-        self.p_real *= (self.c_puct / torch.sum(self.p_real))
+        result = NoForbidden.final(board, lst_action)
+        self.final = True if result != -1 else False
+        if self.final:
+            self.q = 1 if result == board.turn else -1
+        else:
+            self.nn = torch.ones(Env.board_sz, device=Env.device)
+            self.qn = torch.zeros(Env.board_sz, device=Env.device)
+            self.p_real = self.p.clone().detach().squeeze_(0)
+            self.legal  = torch.ones(Env.board_sz)
+            for i in range(0, Env.board_shape[0]):
+                for j in range(0, Env.board_shape[1]):
+                    if board[i][j] != -1:
+                        self.legal[i*Env.board_shape[0]+j] = 0
+                        self.p_real[i*Env.board_shape[0]+j] = 0
+                    else: self.nodes[i*Env.board_shape[0]+j] = MCTS_node()
+            self.p_real *= (self.c_puct / torch.sum(self.p_real))
+
         if self_play:
             ...
 
@@ -54,10 +63,11 @@ class MCTS_node():
         return torch.argmax(puct).item()
 
     def search(self, board:Board, policynet:nn.Module, valuenet:nn.Module, \
-        calc_tot:int, self_play = False):
+        calc_tot:int, self_play = False, lst_action = (-2, -2, -2)):
         if self.n == 0:
-            self.expand(board, policynet, valuenet, self_play)
-            if calc_tot == 1:  return self.v
+            self.expand(board, policynet, valuenet, self_play, lst_action)
+            if calc_tot == 1:  return self.q
+        if self.final:  return self.q
         for i in range(0, calc_tot):
             # node = self.select_node(self_play)
             index = self.select_node(self_play)
@@ -66,7 +76,7 @@ class MCTS_node():
             
             board[x][y] = board.turn
             board.turn ^= 1
-            q_new = node.search(board, policynet, valuenet, 1, self_play)
+            q_new = node.search(board, policynet, valuenet, 1, self_play, (x, y, board.turn^1))
             board.turn ^= 1
             board[x][y] = -1
 
