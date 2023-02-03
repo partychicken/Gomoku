@@ -72,7 +72,7 @@ class MCTS_node():
             # node = self.select_node(self_play)
             index = self.select_node(self_play)
             node = self.nodes[index]
-            x, y = index/Env.board_shape[1],index%Env.board_shape[1]
+            x, y = self.index_to_coord(index)
             
             board[x][y] = board.turn
             board.turn ^= 1
@@ -95,9 +95,8 @@ class MCTS_node():
             noise = torch.where(self.legal == 1, noise, torch.zeros(Env.board_sz))
             dis += ((self.diri_ratio/(1-self.diri_ratio)) * torch.sum(dis)\
                  / torch.sum(noise)) * noise
-        sample = torch.multinomial(dis, 1)
-        x = sample / Env.board_shape[1]
-        y = sample % Env.board_shape[1]
+        sample = torch.multinomial(dis, 1).item()
+        x, y = self.index_to_coord(sample)
         subtree = self.nodes[sample]
         return x, y, subtree
         
@@ -106,23 +105,24 @@ class MCTS_node():
         if index in self.nodes:  return self.nodes[index]
         else:  return MCTS_node()
 
+    def index_to_coord(self, index:int):
+        x = index // Env.board_shape[1]
+        y = index % Env.board_shape[1]
+        return x, y
 
 class GomokuAI(Player):
     def __init__(self, name = '', policynet:nn.Module = None, valuenet:nn.Module = None):
         super().__init__(name)
-        if policynet is None:
-            policynet = models.resnet18()
-            policynet.fc = nn.Sequential(nn.Linear(512, Env.board_sz), nn.Softmax(dim=1))
-        if valuenet is None:
-            valuenet  = models.resnet18()
-            valuenet.fc  = nn.Sequential(nn.Linear(512, 1), nn.Tanh())
+        if policynet is None or valuenet is None:
+            pnet, vnet = gomokunet.default_net()
+            if policynet is None:  policynet = pnet
+            if valuenet  is None:  valuenet  = vnet
         self.policynet = policynet
         self.valuenet  = valuenet
 
-    def init_game(self, board:Board, color, turn):
+    def init_game(self, board:Board, color):
         self.board = copy.deepcopy(board)
         self.color = color
-        self.turn  = turn
         self.policynet.eval()
         self.valuenet.eval()
 

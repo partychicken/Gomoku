@@ -6,7 +6,8 @@ from torchvision import models
 from board import Board
 
 class Env:
-    device      = torch.device('cuda')
+    # device      = torch.device('cuda')
+    device      = torch.device('cpu')
     board_shape = (15, 15)
     board_sz    = board_shape[0]*board_shape[1]
 
@@ -20,28 +21,24 @@ def board_to_tensor(board:Board):
     t.unsqueeze_(0)
     return t
 
-class GomokuNet(nn.Module):
-    ...
-
-if __name__ == '__main__':
+def default_net():
     os.chdir(os.path.dirname(__file__))
     if not os.path.exists('./model/'):
         os.makedirs('./model/')
-
     policynet = models.resnet18()
     valuenet  = models.resnet18()
-    # resnet18.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3,bias=False)
     policynet.fc = nn.Sequential(nn.Linear(512, Env.board_sz), nn.Softmax(dim=1))
     valuenet.fc  = nn.Sequential(nn.Linear(512, 1), nn.Tanh())
-    # resnet18.fc = nn.Sequential(nn.Linear(512, 15*15+1), nn.Softmax(dim=1))
-
-    if os.path.exists('./model/policynet.pt'):
-        policynet.load_state_dict(torch.load('./model/policynet.pt'))
-    if os.path.exists('./model/valuenet.pt'):
-        valuenet.load_state_dict(torch.load('./model/valuenet.pt'))
-
+    if os.path.exists('./model/policynet18.pt'):
+        policynet.load_state_dict(torch.load('./model/policynet18.pt'))
+    if os.path.exists('./model/valuenet18.pt'):
+        valuenet.load_state_dict(torch.load('./model/valuenet18.pt'))
     policynet.to(Env.device)
     valuenet.to(Env.device)
+    return policynet, valuenet
+
+if __name__ == '__main__':
+    policynet, valuenet = default_net()
 
     policynet.eval()
     valuenet.eval()
@@ -59,22 +56,12 @@ if __name__ == '__main__':
     b = board_to_tensor(bd)
     # print(b)
     x, y = policynet(b), valuenet(b)
-    # print(x)
-    # print(y)
-    # print(x.size())
-    # print(y.size())
-    pp = x.clone().detach()
-    for i in range(0, Env.board_shape[0]):
-        for j in range(0, Env.board_shape[1]):
-            if b[0][0][i][j] == 1 or b[0][1][i][j] == 1:
-                pp[0][i*Env.board_shape[0]+j] = 0
-    pp /= torch.sum(pp)
     print(x)
-    print(pp)
     z = y.item()
     print(z)
     # print(x.data)
     # print(torch.sum(x.data))
     # print(x.data[0][15*15])
     ...
-    # torch.save(resnet18.state_dict(), './model/resnet18.pt')
+    torch.save(policynet.state_dict(), './model/policynet18.pt')
+    torch.save(valuenet.state_dict(), './model/valuenet18.pt')
