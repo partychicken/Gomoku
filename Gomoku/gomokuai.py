@@ -22,7 +22,7 @@ class MCTS_node():
         self.p      = [] # 神经网络输出的各个行动的概率分布，是二维1x225tensor
         self.v      = 0  # 神经网络输出的价值/胜率，是float
         self.nn     = [] # 子结点访问次数+1，是一维tensor
-        self.qn     = [] # 子结点的q，是一维tensor
+        self.qn     = [] # 子结点的q取负，是一维tensor
         self.legal  = [] # 所有能落子的位置，是一维tensor，用0/1表示
         self.p_real = [] # 去除p中不能落子位置的概率分布再乘上c_puct，是一维tensor
         self.nodes  = {} # 子结点字典，用下一次落子的坐标x*15+y作为key
@@ -70,11 +70,11 @@ class MCTS_node():
             board.turn ^= 1
             board[x][y] = -1
 
-            self.q = (self.n*self.q + q_new) / (self.n+1)
+            self.q = (self.n*self.q - q_new) / (self.n+1)
             self.n += 1
-            self.qn[index] = self.nodes[index].q
+            self.qn[index] = -self.nodes[index].q
             self.nn[index] += 1
-        return q_new if calc_tot == 1 else self.q
+        return -q_new if calc_tot == 1 else self.q # 返回本次search获得的价值
         
     def choose_action(self, self_play = False):
         dis = self.nn - 1
