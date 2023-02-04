@@ -16,8 +16,7 @@ class MCTS_node():
     diri_alpha = 0.3  # Dirichlet噪声的浓度参数alpha
 
     def __init__(self) -> None:
-        # self.board = copy.deepcopy(board)
-        # self.board = [] # 棋盘状态的tensor
+        self.state  = [] # 棋盘状态的tensor
         self.n      = 0  # 搜索次数，结点自身通过神经网络推断并扩展（expand）占用一次搜索次数
         self.q      = 0  # n次搜索后的平均价值，是各个子结点价值和self.v根据访问次数的加权平均
         self.p      = [] # 神经网络输出的各个行动的概率分布，是二维1x225tensor
@@ -31,10 +30,10 @@ class MCTS_node():
 
     def expand(self, board:Board, policynet:nn.Module, valuenet:nn.Module, self_play\
         , lst_action = (-2, -2, -2)):
-        state = gomokunet.board_to_tensor(board)
+        self.state = gomokunet.board_to_tensor(board)
         self.n  = 1
-        self.p  = policynet(state)
-        self.q  = self.v = valuenet(state).item()
+        self.p  = policynet(self.state)
+        self.q  = self.v = valuenet(self.state).item()
         result = NoForbidden.final(board, lst_action)
         self.final = True if result != -1 else False
         if self.final:
@@ -98,7 +97,7 @@ class MCTS_node():
         sample = torch.multinomial(dis, 1).item()
         x, y = self.index_to_coord(sample)
         subtree = self.nodes[sample]
-        return x, y, subtree
+        return x, y, subtree, dis
         
     def get_subtree(self, action):
         index = action[0]*Env.board_shape[1] + action[1]
@@ -120,11 +119,14 @@ class GomokuAI(Player):
         self.policynet = policynet
         self.valuenet  = valuenet
 
-    def init_game(self, board:Board, color):
+    def init_game(self, board:Board, color, self_play = False):
         self.board = copy.deepcopy(board)
         self.color = color
         self.policynet.eval()
         self.valuenet.eval()
+        self.self_play = self_play
+        self.state_seq = []
+        self.target_seq = []
 
     def start_play(self): 
         self.root = MCTS_node()
@@ -132,8 +134,12 @@ class GomokuAI(Player):
     def next_action(self, sec = 0, calc_tot = 100): 
         # t1 = time.process_time()
         with torch.no_grad():
-            self.root.search(self.board, self.policynet, self.valuenet, calc_tot)
-            x, y, subtree = self.root.choose_action()
+            self.root.search(self.board, self.policynet, self.valuenet, calc_tot\
+                , self.self_play)
+            x, y, subtree, dis = self.root.choose_action()
+            if self.self_play:
+                self.state_seq.append(self.root.state)
+                self.target_seq.append((dis, self.root.q))
         # t2 = time.process_time()
         # print('use time', (t2-t1)*1000)
 

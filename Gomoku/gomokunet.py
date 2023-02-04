@@ -6,6 +6,7 @@ import torch.optim as optim
 from torchvision import models
 from board import Board
 from tqdm import tqdm
+from torch.utils.data import DataLoader, Dataset
 
 class Env:
     device      = torch.device('cuda')
@@ -16,6 +17,7 @@ class Env:
     datapool_sz = ...
     batch_sz    = ...
     epochs      = ...
+    num_workers = 0
 
 def board_to_tensor(board:Board):
     b = board.board.flatten()
@@ -43,11 +45,37 @@ def default_net():
     valuenet.to(Env.device)
     return policynet, valuenet
 
-def init_datapool():
+class MyDataset(Dataset):
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+    def __len__(self):
+        return len(self.x)
+
+    def __getitem__(self, index):
+        return self.x[index], self.y[index]
+
+def get_selfplay_data():
     ...
 
+def data_augmentation(state, target):
+    ...
+
+def init_datapool() -> DataLoader:
+    x, y = [], []
+    while len(x) < Env.datapool_sz:
+        x1, y1 = get_selfplay_data()
+        data_augmentation(x1, y1)
+        x += x1
+        y += y1
+    dataset = MyDataset(x, y)
+    dataloader = DataLoader(dataset=dataset, batch_size=Env.batch_sz\
+        , shuffle=True, num_workers=Env.num_workers)
+    return dataloader
+
 def train(policynet:nn.Module, valuenet:nn.Module):
-    init_datapool()
+    data_loader = init_datapool()
     policynet.train()
     valuenet.train()
     policy_criterion = nn.CrossEntropyLoss()
@@ -56,20 +84,21 @@ def train(policynet:nn.Module, valuenet:nn.Module):
     value_optimizer = optim.SGD(valuenet.parameters(), lr=0.001, momentum=0.9)
 
     for epoch in tqdm(range(Env.epochs)):
-        # 清空梯度
-        policy_optimizer.zero_grad()
-        value_optimizer.zero_grad()
+        for index, batch in enumerate(data_loader):
+            # 清空梯度
+            policy_optimizer.zero_grad()
+            value_optimizer.zero_grad()
 
-        # forward, backward, optimize
-        inputs, policy_target, value_target = ...
-        policy_out = policynet(inputs)
-        value_out  = valuenet(inputs)
-        policy_loss = policy_criterion(policy_out, policy_target)
-        value_loss  = value_criterion(value_out, value_target)
-        policy_loss.backward()
-        value_loss.backward()
-        policy_optimizer.step()
-        value_optimizer.step()
+            # forward, backward, optimize
+            inputs, policy_target, value_target = ...
+            policy_out = policynet(inputs)
+            value_out  = valuenet(inputs)
+            policy_loss = policy_criterion(policy_out, policy_target)
+            value_loss  = value_criterion(value_out, value_target)
+            policy_loss.backward()
+            value_loss.backward()
+            policy_optimizer.step()
+            value_optimizer.step()
         
         # 调整学习率
         ...
