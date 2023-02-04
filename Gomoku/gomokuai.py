@@ -6,9 +6,9 @@ from player import Player
 from rule import NoForbidden
 import torch
 from torch import nn
-from torchvision import models
 import gomokunet
 from gomokunet import Env
+import time
 
 class MCTS_node():
     c_puct = 5.0      # PUCT的常数因子
@@ -43,7 +43,7 @@ class MCTS_node():
             self.nn = torch.ones(Env.board_sz, device=Env.device)
             self.qn = torch.zeros(Env.board_sz, device=Env.device)
             self.p_real = self.p.clone().detach().squeeze_(0)
-            self.legal  = torch.ones(Env.board_sz)
+            self.legal  = torch.ones(Env.board_sz, device=Env.device)
             for i in range(0, Env.board_shape[0]):
                 for j in range(0, Env.board_shape[1]):
                     if board[i][j] != -1:
@@ -91,8 +91,8 @@ class MCTS_node():
         # 自学习时，加入狄利克雷噪声
         if self_play:
             noise = torch.distributions.dirichlet.Dirichlet(\
-                     torch.ones(Env.board_sz)*self.diri_alpha).sample()
-            noise = torch.where(self.legal == 1, noise, torch.zeros(Env.board_sz))
+                     torch.ones(Env.board_sz, device=Env.device)*self.diri_alpha).sample()
+            noise = torch.where(self.legal == 1, noise, torch.zeros(Env.board_sz, device=Env.device))
             dis += ((self.diri_ratio/(1-self.diri_ratio)) * torch.sum(dis)\
                  / torch.sum(noise)) * noise
         sample = torch.multinomial(dis, 1).item()
@@ -130,8 +130,12 @@ class GomokuAI(Player):
         self.root = MCTS_node()
 
     def next_action(self, sec = 0, calc_tot = 100): 
-        self.root.search(self.board, self.policynet, self.valuenet, calc_tot)
-        x, y, subtree = self.root.choose_action()
+        # t1 = time.process_time()
+        with torch.no_grad():
+            self.root.search(self.board, self.policynet, self.valuenet, calc_tot)
+            x, y, subtree = self.root.choose_action()
+        # t2 = time.process_time()
+        # print('use time', (t2-t1)*1000)
 
         self.root = subtree
         action = (x, y, self.board.turn)

@@ -87,7 +87,7 @@ class GomokuUI:
         # 字母坐标
         count = 0
         for i in range(65, 65+board.col):
-            if chr(i) == 'I':  continue;
+            # if chr(i) == 'I':  continue
             label = tk.Label(self.canvas, text = chr(i), fg = "black")
             label.place(x = self.board_st[0]+self.piece_sz*count, \
                         y = self.board_st[1]-self.piece_sz/2-2, anchor = 's')
@@ -256,7 +256,8 @@ if __name__ == '__main__':
     # board[7][7] = 0
     # board[6][7] = 1
     # p0, p1 = Person('Alice'), Person('Bob')
-    p0 = GomokuAI('Alice')
+    # p0 = GomokuAI('Alice')
+    p0 = Person('Alice')
     p1 = Person('Bob')
     g = GomokuUI(p0, p1, NoForbidden, board)
     g.draw_ui()
