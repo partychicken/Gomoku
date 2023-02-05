@@ -6,7 +6,7 @@ class Rule:
     def judge(cls, board: Board, action) -> bool: ...
 
     # judge whether game is end.
-    # 0: black win, 1: white win, -1: not end.
+    # 0: black win, 1: white win, -1: not end, 2: tie.
     @classmethod
     def final(cls, board: Board) -> int: ...
 
@@ -32,7 +32,7 @@ class NoForbidden(Rule):
             if action[0] == -1 and action[1] == -1:  return True
             if action[0] >= 0 and action[1] >= 0 and\
               action[0] < board.row and action[1] < board.col and\
-              board[action[0]][action[1]] == -1:
+              board.get(action[0], action[1]) == -1:
                 return True
             return False
         except Exception:
@@ -40,39 +40,40 @@ class NoForbidden(Rule):
 
     @classmethod
     def final(cls, board: Board, action = (-2, -2, -2)) -> int:
+        if board.n == board.col * board.row:  return 2
         if action == (-2, -2, -2):
             if board.win != -1:  return board.win
             flag = True
             for i in range(board.row):
                 for j in range(board.col):
-                    if board[i][j] == -1:  continue
+                    if board.get(i, j) == -1:  continue
                     if i+5 <= board.row:
                         for k in range(i+1, i+5): 
-                            if board[k][j] != board[i][j]: 
+                            if board.get(k, j) != board.get(i, j): 
                                 flag = False
                                 break
-                        if flag:  return board[i][j]
+                        if flag:  return board.get(i, j)
                         flag = True
                     if j+5 <= board.col:
                         for k in range(j+1, j+5): 
-                            if board[i][k] != board[i][j]: 
+                            if board.get(i, k) != board.get(i, j): 
                                 flag = False
                                 break
-                        if flag:  return board[i][j]
+                        if flag:  return board.get(i, j)
                         flag = True
                     if i+5 <= board.row and j+5 <= board.col:
                         for k in range(1, 5):
-                            if board[i+k][j+k] != board[i][j]:
+                            if board.get(i+k, j+k) != board.get(i, j):
                                 flag = False
                                 break
-                        if flag:  return board[i][j]
+                        if flag:  return board.get(i, j)
                         flag = True
                     if i+5 <= board.row and j-4 >= 0:
                         for k in range(1, 5):
-                            if board[i+k][j-k] != board[i][j]:
+                            if board.get(i+k, j-k) != board.get(i, j):
                                 flag = False
                                 break
-                        if flag:  return board[i][j]
+                        if flag:  return board.get(i, j)
                         flag = True
             return -1
         else:
@@ -82,31 +83,31 @@ class NoForbidden(Rule):
                 flag = True
                 if i+5 <= board.row:
                     for k in range(i+1, i+5): 
-                        if board[k][j] != board[i][j]: 
+                        if board.get(k, j) != board.get(i, j): 
                             flag = False
                             break
-                    if flag:  return board[i][j]
+                    if flag:  return board.get(i, j)
                     flag = True
                 if j+5 <= board.col:
                     for k in range(j+1, j+5): 
-                        if board[i][k] != board[i][j]: 
+                        if board.get(i, k) != board.get(i, j): 
                             flag = False
                             break
-                    if flag:  return board[i][j]
+                    if flag:  return board.get(i, j)
                     flag = True
                 if i+5 <= board.row and j+5 <= board.col:
                     for k in range(1, 5):
-                        if board[i+k][j+k] != board[i][j]:
+                        if board.get(i+k, j+k) != board.get(i, j):
                             flag = False
                             break
-                    if flag:  return board[i][j]
+                    if flag:  return board.get(i, j)
                     flag = True
                 if i+5 <= board.row and j-4 >= 0:
                     for k in range(1, 5):
-                        if board[i+k][j-k] != board[i][j]:
+                        if board.get(i+k, j-k) != board.get(i, j):
                             flag = False
                             break
-                    if flag:  return board[i][j]
+                    if flag:  return board.get(i, j)
                     flag = True
                 return -1
             return -1
@@ -117,6 +118,6 @@ class NoForbidden(Rule):
             board.turn ^= 1
             if action[0] == -1 and action[1] == -1:
                 board.win = action[2]^1
-            board[action[0]][action[1]] = action[2]
+            board.put(action[0], action[1], action[2])
             return True
         return False

@@ -6,8 +6,8 @@ from player import Player
 from rule import NoForbidden
 import torch
 from torch import nn
-import gomokunet
-from gomokunet import Env
+import gomokuenv
+from gomokuenv import Env
 import time
 
 class MCTS_node():
@@ -30,14 +30,15 @@ class MCTS_node():
 
     def expand(self, board:Board, policynet:nn.Module, valuenet:nn.Module, self_play\
         , lst_action = (-2, -2, -2)):
-        self.state = gomokunet.board_to_tensor(board)
+        self.state = gomokuenv.board_to_tensor(board)
         self.n  = 1
         self.p  = policynet(self.state)
         self.q  = self.v = valuenet(self.state).item()
         result = NoForbidden.final(board, lst_action)
         self.final = True if result != -1 else False
         if self.final:
-            self.q = 1 if result == board.turn else -1
+            if result == 2:  self.q = 0
+            else: self.q = 1 if result == board.turn else -1
         else:
             self.nn = torch.ones(Env.board_sz, device=Env.device)
             self.qn = torch.zeros(Env.board_sz, device=Env.device)
@@ -45,21 +46,20 @@ class MCTS_node():
             self.legal  = torch.ones(Env.board_sz, device=Env.device)
             for i in range(0, Env.board_shape[0]):
                 for j in range(0, Env.board_shape[1]):
-                    if board[i][j] != -1:
+                    if board.get(i, j) != -1:
                         self.legal[i*Env.board_shape[0]+j] = 0
                         self.p_real[i*Env.board_shape[0]+j] = 0
                     else: self.nodes[i*Env.board_shape[0]+j] = MCTS_node()
             self.p_real *= (self.c_puct / torch.sum(self.p_real))
-
-        if self_play:
-            ...
+            # print(self.p_real)
 
     def select_node(self, self_play):
         # PUCT(s, a) = Q(s, a) + U(s, a)
         # U(s, a) = c_puct * P(s, a) * sqrt(N_root) / (1+N_sub)
         u = (self.p_real * sqrt(self.n)).div(self.nn)
         puct = self.qn + u
-        return torch.argmax(puct).item()
+        index = torch.argmax(puct).item()
+        return index
 
     def search(self, board:Board, policynet:nn.Module, valuenet:nn.Module, \
         calc_tot:int, self_play = False, lst_action = (-2, -2, -2)):
@@ -70,14 +70,15 @@ class MCTS_node():
         for i in range(0, calc_tot):
             # node = self.select_node(self_play)
             index = self.select_node(self_play)
-            node = self.nodes[index]
             x, y = self.index_to_coord(index)
+            # print(board.get(x, y))
+            node = self.nodes[index]
             
-            board[x][y] = board.turn
+            board.put(x, y, board.turn)
             board.turn ^= 1
             q_new = node.search(board, policynet, valuenet, 1, self_play, (x, y, board.turn^1))
             board.turn ^= 1
-            board[x][y] = -1
+            board.put(x, y, -1)
 
             self.q = (self.n*self.q - q_new) / (self.n+1)
             self.n += 1
@@ -110,36 +111,38 @@ class MCTS_node():
         return x, y
 
 class GomokuAI(Player):
-    def __init__(self, name = '', policynet:nn.Module = None, valuenet:nn.Module = None):
+    def __init__(self, name = '', policynet:nn.Module = None, valuenet:nn.Module = None\
+        , self_play = False):
         super().__init__(name)
         if policynet is None or valuenet is None:
-            pnet, vnet = gomokunet.default_net()
+            pnet, vnet = gomokuenv.default_net()
             if policynet is None:  policynet = pnet
             if valuenet  is None:  valuenet  = vnet
         self.policynet = policynet
         self.valuenet  = valuenet
+        self.self_play = self_play
 
-    def init_game(self, board:Board, color, self_play = False):
+    def init_game(self, board:Board, color):
         self.board = copy.deepcopy(board)
         self.color = color
         self.policynet.eval()
         self.valuenet.eval()
-        self.self_play = self_play
         self.state_seq = []
         self.target_seq = []
 
     def start_play(self): 
         self.root = MCTS_node()
 
-    def next_action(self, sec = 0, calc_tot = 100): 
+    def next_action(self, sec = 0, calc_tot = 50): 
         # t1 = time.process_time()
         with torch.no_grad():
             self.root.search(self.board, self.policynet, self.valuenet, calc_tot\
                 , self.self_play)
             x, y, subtree, dis = self.root.choose_action()
             if self.self_play:
-                self.state_seq.append(self.root.state)
-                self.target_seq.append((dis, self.root.q))
+                self.state_seq.append(self.root.state.squeeze_(0))
+                self.target_seq.append((dis/torch.sum(dis)\
+                    , torch.tensor([self.root.q], device=Env.device)))
         # t2 = time.process_time()
         # print('use time', (t2-t1)*1000)
 

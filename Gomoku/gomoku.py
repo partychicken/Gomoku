@@ -33,6 +33,7 @@ class Gomoku:
             action = current_player.next_action()
             if not self.rule.play(self.board, action):
                 result = self.board.turn ^ 1
+                assert False
                 break
             self.seq.put(action)
             opposite_player.opponent_action(action)

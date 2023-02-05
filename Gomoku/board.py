@@ -9,11 +9,21 @@ class Board:
         self.board = -np.ones(shape=(self.row, self.col), dtype=np.int8)
         self.win   = -1
         self.turn  = turn
+        self.n     = 0 #棋子数
 
-    def __getitem__(self, index):
-        return self.board.__getitem__(index)
+    # def __getitem__(self, index):
+    #     return self.board.__getitem__(index)
+
+    def get(self, x, y):
+        return self.board[x][y]
+
+    def put(self, x, y, value):
+        if self.board[x][y] != -1:  self.n -= 1
+        if value != -1:             self.n += 1
+        self.board[x][y] = value
 
     def clear(self):
         self.board = -np.ones(shape=(self.row, self.col), dtype=np.int8)
         self.win   = -1
         self.turn  = 0
+        self.n     = 0

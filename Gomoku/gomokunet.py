@@ -1,49 +1,14 @@
-import os
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torchvision import models
-from board import Board
 from tqdm import tqdm
 from torch.utils.data import DataLoader, Dataset
-
-class Env:
-    device      = torch.device('cuda')
-    # device      = torch.device('cpu')
-    board_shape = (15, 15)
-    board_sz    = board_shape[0]*board_shape[1]
-    # train parameter
-    datapool_sz = ...
-    batch_sz    = ...
-    epochs      = ...
-    num_workers = 0
-
-def board_to_tensor(board:Board):
-    b = board.board.flatten()
-    b1 = np.array([1 if x == 0 else 0 for x in b]).reshape(Env.board_shape)
-    b2 = np.array([1 if x == 1 else 0 for x in b]).reshape(Env.board_shape)
-    b3 = np.ones(shape=Env.board_shape, dtype=np.int8) \
-        if board.turn == 1 else np.zeros(shape=Env.board_shape,dtype=np.int8)
-    t = torch.tensor(np.array([b1, b2, b3]), device=Env.device).float()
-    t.unsqueeze_(0)
-    return t
-
-def default_net():
-    os.chdir(os.path.dirname(__file__))
-    if not os.path.exists('./model/'):
-        os.makedirs('./model/')
-    policynet = models.resnet18()
-    valuenet  = models.resnet18()
-    policynet.fc = nn.Sequential(nn.Linear(512, Env.board_sz), nn.Softmax(dim=1))
-    valuenet.fc  = nn.Sequential(nn.Linear(512, 1), nn.Tanh())
-    if os.path.exists('./model/policynet18.pt'):
-        policynet.load_state_dict(torch.load('./model/policynet18.pt'))
-    if os.path.exists('./model/valuenet18.pt'):
-        valuenet.load_state_dict(torch.load('./model/valuenet18.pt'))
-    policynet.to(Env.device)
-    valuenet.to(Env.device)
-    return policynet, valuenet
+from gomoku import Gomoku
+from gomokuenv import *
+from gomokuai import GomokuAI
+from board import Board
+from rule import NoForbidden
 
 class MyDataset(Dataset):
     def __init__(self, x, y):
@@ -54,28 +19,56 @@ class MyDataset(Dataset):
         return len(self.x)
 
     def __getitem__(self, index):
-        return self.x[index], self.y[index]
+        return self.x[index], self.y[index][0], self.y[index][1]
 
-def get_selfplay_data():
-    ...
+def get_selfplay_data(policynet:nn.Module, valuenet:nn.Module):
+    p0 = GomokuAI('p0', policynet, valuenet, True)
+    p1 = GomokuAI('p1', policynet, valuenet, True)
+    g = Gomoku(p0, p1, NoForbidden, Board(Env.board_shape[0], Env.board_shape[1]))
+    result = g.play()
+    if result == 0:
+        return p0.state_seq, p0.target_seq
+    elif result == 1 or result == 2:
+        return p1.state_seq, p1.target_seq
+    else:  assert False
 
-def data_augmentation(state, target):
-    ...
+def data_augmentation(states, targets):
+    s, t = [], []
+    for index, state in enumerate(states):
+        p, q = targets[index]
+        p = p.reshape(shape=Env.board_shape)
+        s1, p1 = torch.flip(state, [1]), torch.flip(p, [0])
+        s2, p2 = torch.flip(state, [2]), torch.flip(p, [1])
+        s3, p3 = torch.flip(s2   , [1]), torch.flip(p2, [0])
+        s4, p4 = torch.rot90(state, 1, [1, 2]), torch.rot90(p, 1, [0, 1])
+        s5, p5 = torch.flip(s4   , [1]), torch.flip(p4, [0])
+        s6, p6 = torch.flip(s4   , [2]), torch.flip(p4, [1])
+        s7, p7 = torch.flip(s6   , [1]), torch.flip(p6, [0])
+        pp = [p1, p2, p3, p4, p5, p6, p7]
+        for i in range(7): pp[i] = pp[i].reshape(shape=(Env.board_sz,))
+        s += [s1, s2, s3, s4, s5, s6, s7]
+        t += list(zip(pp, [q, q, q, q, q, q, q]))
+    states += s
+    targets += t
 
-def init_datapool() -> DataLoader:
+def init_datapool(policynet:nn.Module, valuenet:nn.Module) -> DataLoader:
     x, y = [], []
     while len(x) < Env.datapool_sz:
-        x1, y1 = get_selfplay_data()
+        x1, y1 = get_selfplay_data(policynet, valuenet)
+        print('a selfplay finished.')
         data_augmentation(x1, y1)
+        print('an augmentation finished.')
         x += x1
         y += y1
+        print('len x = ' + str(len(x)))
+    print('data collection finished.')
     dataset = MyDataset(x, y)
     dataloader = DataLoader(dataset=dataset, batch_size=Env.batch_sz\
         , shuffle=True, num_workers=Env.num_workers)
     return dataloader
 
 def train(policynet:nn.Module, valuenet:nn.Module):
-    data_loader = init_datapool()
+    data_loader = init_datapool(policynet, valuenet)
     policynet.train()
     valuenet.train()
     policy_criterion = nn.CrossEntropyLoss()
@@ -84,17 +77,17 @@ def train(policynet:nn.Module, valuenet:nn.Module):
     value_optimizer = optim.SGD(valuenet.parameters(), lr=0.001, momentum=0.9)
 
     for epoch in tqdm(range(Env.epochs)):
-        for index, batch in enumerate(data_loader):
+        for index, (inputs, policy_targets, value_targets) in enumerate(data_loader):
             # 清空梯度
             policy_optimizer.zero_grad()
             value_optimizer.zero_grad()
 
             # forward, backward, optimize
-            inputs, policy_target, value_target = ...
+            # inputs, policy_targets, value_targets = ...
             policy_out = policynet(inputs)
             value_out  = valuenet(inputs)
-            policy_loss = policy_criterion(policy_out, policy_target)
-            value_loss  = value_criterion(value_out, value_target)
+            policy_loss = policy_criterion(policy_out, policy_targets)
+            value_loss  = value_criterion(value_out, value_targets)
             policy_loss.backward()
             value_loss.backward()
             policy_optimizer.step()
@@ -103,16 +96,9 @@ def train(policynet:nn.Module, valuenet:nn.Module):
         # 调整学习率
         ...
 
-        # torch.save(policynet.state_dict(), './model/policynet18.pt')
-        # torch.save(valuenet.state_dict(), './model/valuenet18.pt')
     ...
 
 if __name__ == '__main__':
     policynet, valuenet = default_net()
-
-    # policynet.eval()
-    # valuenet.eval()
-
     train(policynet, valuenet)
-    torch.save(policynet.state_dict(), './model/policynet18.pt')
-    torch.save(valuenet.state_dict(), './model/valuenet18.pt')
+    save_default_net(policynet, valuenet)

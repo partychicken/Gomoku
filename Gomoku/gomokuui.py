@@ -11,6 +11,7 @@ from player import Player, Person
 from rule import NoForbidden
 from gomoku import Gomoku
 from gomokuai import GomokuAI
+from gomokuenv import Env
 from PIL import Image, ImageTk
 
 class MyThread(threading.Thread):
@@ -99,8 +100,8 @@ class GomokuUI:
         # 初始化棋盘上的子
         for i in range(board.row):
             for j in range(board.col):
-                if board[i][j] == 0 or board[i][j] == 1:
-                    self.draw_piece(i, j, color = board[i][j])
+                if board.get(i, j) == 0 or board.get(i, j) == 1:
+                    self.draw_piece(i, j, color = board.get(i, j))
 
         # 提示当前应该落什么颜色的字
         self.current_piece_canvas = tk.Canvas(self.root, \
@@ -133,9 +134,9 @@ class GomokuUI:
         board = self.gomoku.board
         for i in range(board.row):
             for j in range(board.col):
-                if board[i][j] != -1:
+                if board.get(i, j) != -1:
                     self.delete_piece(i, j)
-                    board[i][j] = -1
+                    board.put(i, j, -1)
 
         if self.result != -1:
             self.result_label.destroy()
@@ -186,7 +187,8 @@ class GomokuUI:
         self.concede_button['state'] = tk.DISABLED
         self.set_board_button['state'] = tk.NORMAL
         self.clear_board_button['state'] = tk.NORMAL
-        result_text = '黑方胜' if self.result == 0 else '白方胜'
+        result_text = ['黑方胜', '白方胜', '平局'][self.result]
+        # result_text = '黑方胜' if self.result == 0 else '白方胜'
         self.result_label = tk.Label(self.root, text=result_text, font=('楷体', 14),\
             width=10, height=2)
         self.result_label.grid(row = 1, column = 1)
@@ -202,8 +204,8 @@ class GomokuUI:
         if x < 0 or y < 0 or x >= self.gomoku.board.row or y >= self.gomoku.board.col: 
             return
         if self.mode == 'set_board':
-            if self.gomoku.board[x][y] != -1:  return
-            self.gomoku.board[x][y] = self.gomoku.board.turn
+            if self.gomoku.board.get(x, y) != -1:  return
+            self.gomoku.board.put(x, y, self.gomoku.board.turn)
             self.draw_piece(x, y, self.gomoku.board.turn)
             self.gomoku.board.turn ^= 1
             self.refresh_current_piece()
@@ -216,8 +218,8 @@ class GomokuUI:
         y = floor((event.x-self.board_st[0]+self.piece_sz/2) / self.piece_sz)
         x = floor((event.y-self.board_st[1]+self.piece_sz/2) / self.piece_sz)
         if self.mode == 'set_board':
-            if self.gomoku.board[x][y] != -1:
-                self.gomoku.board[x][y] = -1
+            if self.gomoku.board.get(x, y) != -1:
+                self.gomoku.board.put(x, y, -1)
                 self.delete_piece(x, y)
 
     def delete_piece(self, x, y):
@@ -250,14 +252,15 @@ class GomokuUI:
         self.root.mainloop()
 
 if __name__ == '__main__':
-    board = Board()
+    board = Board(Env.board_shape[0], Env.board_shape[1])
     # board[4][4] = 1
     # board[7][6] = 0
     # board[7][7] = 0
     # board[6][7] = 1
     # p0, p1 = Person('Alice'), Person('Bob')
-    # p0 = GomokuAI('Alice')
-    p0 = Person('Alice')
-    p1 = Person('Bob')
+    p0 = GomokuAI('Alice')
+    p1 = GomokuAI('Bob')
+    # p0 = Person('Alice')
+    # p1 = Person('Bob')
     g = GomokuUI(p0, p1, NoForbidden, board)
     g.draw_ui()

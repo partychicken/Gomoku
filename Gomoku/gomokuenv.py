@@ -8,14 +8,14 @@ from board import Board
 class Env:
     device      = torch.device('cuda')
     # device      = torch.device('cpu')
-    board_shape = (15, 15)
+    board_shape = (9, 9)
     board_sz    = board_shape[0]*board_shape[1]
     net_suffix  = '_'+str(board_shape[0])+'x'+str(board_shape[1])+'.pt'
-    
+
     # train parameter
-    datapool_sz = 1024
+    datapool_sz = 512
     batch_sz    = 128
-    epochs      = 4
+    epochs      = 16
     num_workers = 0
 
 def board_to_tensor(board:Board, unsqueeze = True):
@@ -25,6 +25,7 @@ def board_to_tensor(board:Board, unsqueeze = True):
     b3 = np.ones(shape=Env.board_shape, dtype=np.int8) \
         if board.turn == 1 else np.zeros(shape=Env.board_shape,dtype=np.int8)
     t = torch.tensor(np.array([b1, b2, b3]), device=Env.device).float()
+    # t = torch.stack([b1, b2, b3], dim=0).to(device=Env.device).float()
     if unsqueeze:  t.unsqueeze_(0)
     return t
 
@@ -43,3 +44,7 @@ def default_net():
     policynet.to(Env.device)
     valuenet.to(Env.device)
     return policynet, valuenet
+
+def save_default_net(policynet:nn.Module, valuenet:nn.Module):
+    torch.save(policynet.state_dict(), './model/policynet'+Env.net_suffix)
+    torch.save(valuenet.state_dict(), './model/valuenet'+Env.net_suffix)
