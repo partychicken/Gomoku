@@ -10,10 +10,12 @@ class Env:
     # device      = torch.device('cpu')
     board_shape = (15, 15)
     board_sz    = board_shape[0]*board_shape[1]
+    net_suffix  = '_'+str(board_shape[0])+'x'+str(board_shape[1])+'.pt'
+    
     # train parameter
-    datapool_sz = ...
-    batch_sz    = ...
-    epochs      = ...
+    datapool_sz = 1024
+    batch_sz    = 128
+    epochs      = 4
     num_workers = 0
 
 def board_to_tensor(board:Board, unsqueeze = True):
@@ -34,10 +36,10 @@ def default_net():
     valuenet  = models.resnet18()
     policynet.fc = nn.Sequential(nn.Linear(512, Env.board_sz), nn.Softmax(dim=1))
     valuenet.fc  = nn.Sequential(nn.Linear(512, 1), nn.Tanh())
-    if os.path.exists('./model/policynet18.pt'):
-        policynet.load_state_dict(torch.load('./model/policynet18.pt'))
-    if os.path.exists('./model/valuenet18.pt'):
-        valuenet.load_state_dict(torch.load('./model/valuenet18.pt'))
+    if os.path.exists('./model/policynet'+Env.net_suffix):
+        policynet.load_state_dict(torch.load('./model/policynet'+Env.net_suffix))
+    if os.path.exists('./model/valuenet'+Env.net_suffix):
+        valuenet.load_state_dict(torch.load('./model/valuenet'+Env.net_suffix))
     policynet.to(Env.device)
     valuenet.to(Env.device)
     return policynet, valuenet
