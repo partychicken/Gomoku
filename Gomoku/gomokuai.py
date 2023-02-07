@@ -49,6 +49,7 @@ class MCTS_node():
                     if board.get(i, j) != -1:
                         self.legal[i*Env.board_shape[0]+j] = 0
                         self.p_real[i*Env.board_shape[0]+j] = 0
+                        self.qn[i*Env.board_shape[0]+j] = -1
                     else: self.nodes[i*Env.board_shape[0]+j] = MCTS_node()
             self.p_real *= (self.c_puct / torch.sum(self.p_real))
             # print(self.p_real)
@@ -59,6 +60,11 @@ class MCTS_node():
         u = (self.p_real * sqrt(self.n)).div(self.nn)
         puct = self.qn + u
         index = torch.argmax(puct).item()
+        if index not in self.nodes:
+            print(self.p_real)
+            print(u)
+            print(self.qn)
+            print(puct)
         return index
 
     def search(self, board:Board, policynet:nn.Module, valuenet:nn.Module, \
@@ -133,7 +139,7 @@ class GomokuAI(Player):
     def start_play(self): 
         self.root = MCTS_node()
 
-    def next_action(self, sec = 0, calc_tot = 50): 
+    def next_action(self, sec = 0, calc_tot = 100): 
         # t1 = time.process_time()
         with torch.no_grad():
             self.root.search(self.board, self.policynet, self.valuenet, calc_tot\
