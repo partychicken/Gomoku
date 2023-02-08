@@ -21,7 +21,7 @@ class MCTS_node():
         self.n      = 0  # 搜索次数，结点自身通过神经网络推断并扩展（expand）占用一次搜索次数
         self.q      = 0  # n次搜索后的平均价值，是各个子结点价值和self.v根据访问次数的加权平均
         # self.p      = [] # 神经网络输出的各个行动的概率分布，是二维1x225tensor, model_device
-        self.v      = 0  # 神经网络输出的价值/胜率，是float
+        # self.v      = 0  # 神经网络输出的价值/胜率，是float
         self.nn     = [] # 子结点访问次数+1，是一维tensor, cpu
         self.qn     = [] # 子结点的q取负，是一维tensor, cpu
         # self.legal  = [] # 所有能落子的位置，是一维tensor，用0/1表示
@@ -40,7 +40,8 @@ class MCTS_node():
             else: self.q = 1 if result == board.turn else -1
         else:
             # self.p  = policynet(self.state)
-            self.q  = self.v = valuenet(self.state).item()
+            # self.q  = self.v = valuenet(self.state).item()
+            self.q  = valuenet(self.state).item()
             self.nn = torch.ones(Env.board_sz, device=self.tensor_dev)
             self.qn = torch.zeros(Env.board_sz, device=self.tensor_dev)
             # self.p_real = self.p.clone().detach().to(self.tensor_dev).squeeze_(0)

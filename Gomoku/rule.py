@@ -46,68 +46,70 @@ class NoForbidden(Rule):
             flag = True
             for i in range(board.row):
                 for j in range(board.col):
-                    if board.get(i, j) == -1:  continue
+                    b_ij = board.get(i, j)
+                    if b_ij == -1:  continue
                     if i+5 <= board.row:
                         for k in range(i+1, i+5): 
-                            if board.get(k, j) != board.get(i, j): 
+                            if board.get(k, j) != b_ij: 
                                 flag = False
                                 break
-                        if flag:  return board.get(i, j)
+                        if flag:  return b_ij
                         flag = True
                     if j+5 <= board.col:
                         for k in range(j+1, j+5): 
-                            if board.get(i, k) != board.get(i, j): 
+                            if board.get(i, k) != b_ij: 
                                 flag = False
                                 break
-                        if flag:  return board.get(i, j)
+                        if flag:  return b_ij
                         flag = True
                     if i+5 <= board.row and j+5 <= board.col:
                         for k in range(1, 5):
-                            if board.get(i+k, j+k) != board.get(i, j):
+                            if board.get(i+k, j+k) != b_ij:
                                 flag = False
                                 break
-                        if flag:  return board.get(i, j)
+                        if flag:  return b_ij
                         flag = True
                     if i+5 <= board.row and j-4 >= 0:
                         for k in range(1, 5):
-                            if board.get(i+k, j-k) != board.get(i, j):
+                            if board.get(i+k, j-k) != b_ij:
                                 flag = False
                                 break
-                        if flag:  return board.get(i, j)
+                        if flag:  return b_ij
                         flag = True
             return -1
         else:
             if action[0] == -1 and action[1] == -1:  return board.win
             if action[0] >= 0 and action[1] >= 0:
                 i, j = action[0], action[1]
+                b_ij = board.get(i, j)
                 flag = True
                 if i+5 <= board.row:
                     for k in range(i+1, i+5): 
-                        if board.get(k, j) != board.get(i, j): 
+                        if board.get(k, j) != b_ij: 
                             flag = False
                             break
-                    if flag:  return board.get(i, j)
+                    if flag:  return b_ij
                     flag = True
                 if j+5 <= board.col:
                     for k in range(j+1, j+5): 
-                        if board.get(i, k) != board.get(i, j): 
+                        if board.get(i, k) != b_ij: 
                             flag = False
                             break
-                    if flag:  return board.get(i, j)
+                    if flag:  return b_ij
                     flag = True
                 if i+5 <= board.row and j+5 <= board.col:
                     for k in range(1, 5):
-                        if board.get(i+k, j+k) != board.get(i, j):
+                        if board.get(i+k, j+k) != b_ij:
                             flag = False
                             break
-                    if flag:  return board.get(i, j)
+                    if flag:  return b_ij
                     flag = True
                 if i+5 <= board.row and j-4 >= 0:
                     for k in range(1, 5):
-                        if board.get(i+k, j-k) != board.get(i, j):
+                        if board.get(i+k, j-k) != b_ij:
                             flag = False
                             break
-                    if flag:  return board.get(i, j)
+                    if flag:  return b_ij
                     flag = True
                 return -1
             return -1
