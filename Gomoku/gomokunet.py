@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import torch
 import torch.nn as nn
@@ -9,6 +10,9 @@ from gomokuenv import *
 from gomokuai import GomokuAI
 from board import Board
 from rule import NoForbidden
+import multiprocessing
+from multiprocessing import Pool
+from queue import Queue
 
 class MyDataset(Dataset):
     def __init__(self, x, y):
@@ -21,9 +25,9 @@ class MyDataset(Dataset):
     def __getitem__(self, index):
         return self.x[index], self.y[index][0], self.y[index][1]
 
-def get_selfplay_data(policynet:nn.Module, valuenet:nn.Module):
-    p0 = GomokuAI('p0', policynet, valuenet, True)
-    p1 = GomokuAI('p1', policynet, valuenet, True)
+def get_selfplay_data(policynet:nn.Module, valuenet:nn.Module, device):
+    p0 = GomokuAI('p0', policynet, valuenet, device, True)
+    p1 = GomokuAI('p1', policynet, valuenet, device, True)
     g = Gomoku(p0, p1, NoForbidden, Board(Env.board_shape[0], Env.board_shape[1]))
     result = g.play()
     if result == 0:
@@ -51,24 +55,30 @@ def data_augmentation(states, targets):
     states += s
     targets += t
 
-def init_datapool(policynet:nn.Module, valuenet:nn.Module) -> DataLoader:
-    x, y = [], []
-    while len(x) < Env.datapool_sz:
-        x1, y1 = get_selfplay_data(policynet, valuenet)
-        print('a selfplay finished.')
-        data_augmentation(x1, y1)
-        print('an augmentation finished.')
-        x += x1
-        y += y1
-        print('len x = ' + str(len(x)))
-    print('data collection finished.')
-    dataset = MyDataset(x, y)
-    dataloader = DataLoader(dataset=dataset, batch_size=Env.batch_sz\
-        , shuffle=True, num_workers=Env.num_workers)
-    return dataloader
+def init_datapool(datapool_sz:int, device, msg_que:Queue, result_que):
+    try:
+        print('子进程%d启动' %os.getpid())
+        policynet, valuenet = default_net(device=torch.device('cpu'))
+        with torch.no_grad():
+            now_sz = 0
+            while now_sz < datapool_sz:
+                print(('[%d]a selfplay starts(' + str(device) + ').') %os.getpid())
+                x1, y1 = get_selfplay_data(policynet, valuenet, device)
+                print(('[%d]a selfplay finished(' + str(device) + ').') %os.getpid())
+                data_augmentation(x1, y1)
+                print('[%d]an augmentation finished.' %os.getpid())
 
-def train(policynet:nn.Module, valuenet:nn.Module):
-    data_loader = init_datapool(policynet, valuenet)
+                result_que.put((x1, y1))
+                now_sz = msg_que.get()
+                now_sz += len(x1)
+                msg_que.put(now_sz)
+
+                print(('[%d]datapool_sz = ' + str(now_sz)) %os.getpid())
+            print('[%d]data collection finished.' %os.getpid())
+    except KeyboardInterrupt:
+        print('子进程%d中断' %os.getpid())
+
+def train(policynet:nn.Module, valuenet:nn.Module, data_loader:DataLoader):
     policynet.train()
     valuenet.train()
     policy_criterion = nn.CrossEntropyLoss()
@@ -78,6 +88,10 @@ def train(policynet:nn.Module, valuenet:nn.Module):
 
     for epoch in tqdm(range(Env.epochs)):
         for index, (inputs, policy_targets, value_targets) in enumerate(data_loader):
+            inputs = inputs.to(Env.device)
+            policy_targets = policy_targets.to(Env.device)
+            value_targets = value_targets.to(Env.device)
+
             # 清空梯度
             policy_optimizer.zero_grad()
             value_optimizer.zero_grad()
@@ -99,6 +113,53 @@ def train(policynet:nn.Module, valuenet:nn.Module):
     ...
 
 if __name__ == '__main__':
+    import cProfile, pstats
+    p = cProfile.Profile()
+    p.enable()
+
+    # 多进程收集数据
+    try:
+        # cpu_cnt = os.cpu_count()
+        # if cpu_cnt is None:  cpu_cnt = 1
+        cpu_cnt = 3
+        print('进程池大小%d' %cpu_cnt)
+        pool = Pool(cpu_cnt)
+        manager = multiprocessing.Manager()
+        msg_que = manager.Queue()
+        msg_que.put(0)
+        result_que = manager.Queue()
+        x, y = [], []
+        for i in range(cpu_cnt):
+            # 传入自对弈模型使用的设备，cpu或cuda
+            device = Env.device if i == 0 else torch.device('cpu')
+            # device = torch.device('cpu')
+            pool.apply_async(init_datapool\
+                , args=(Env.datapool_sz, device, msg_que, result_que))
+        print('等待子进程执行完毕')
+        pool.close()
+        pool.join()
+        print('所有子进程执行完毕')
+    except KeyboardInterrupt:
+        pid = os.getpid()
+        print('主进程%d中断' %pid)
+        os.popen('taskkill.exe /f /pid:%d' %pid)
+    
+    # que = Queue()
+    # init_datapool(Env.datapool_sz, Env.device, que)
+
+    x, y = [], []
+    while not result_que.empty():
+        xx, yy = result_que.get()
+        x += xx
+        y += yy
+    print('real dataset pool size = %d' %(len(x)))
+    dataset = MyDataset(x, y)
+    data_loader = DataLoader(dataset=dataset, batch_size=Env.batch_sz\
+        , shuffle=True, num_workers=Env.num_workers)
     policynet, valuenet = default_net()
-    train(policynet, valuenet)
+    train(policynet, valuenet, data_loader)
     save_default_net(policynet, valuenet)
+
+    p.disable()
+    stats = pstats.Stats(p).sort_stats('tottime')
+    stats.print_stats(10)
