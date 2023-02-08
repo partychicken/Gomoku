@@ -14,7 +14,7 @@ class Env:
 
     # train parameter
     datapool_sz = 1024
-    batch_sz    = 256
+    batch_sz    = 64
     epochs      = 10
     num_workers = 0
 
@@ -38,7 +38,8 @@ def default_net(device = None):
         os.makedirs('./model/')
     policynet = models.resnet18()
     valuenet  = models.resnet18()
-    policynet.fc = nn.Sequential(nn.Linear(512, Env.board_sz), nn.Softmax(dim=1))
+    # policynet.fc = nn.Sequential(nn.Linear(512, Env.board_sz), nn.Softmax(dim=1))
+    policynet.fc = nn.Sequential(nn.Linear(512, Env.board_sz))
     valuenet.fc  = nn.Sequential(nn.Linear(512, 1), nn.Tanh())
     if os.path.exists('./model/policynet'+Env.net_suffix):
         policynet.load_state_dict(torch.load('./model/policynet'+Env.net_suffix))

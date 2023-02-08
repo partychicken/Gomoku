@@ -39,15 +39,11 @@ class MCTS_node():
             if result == 2:  self.q = 0
             else: self.q = 1 if result == board.turn else -1
         else:
-            # self.p  = policynet(self.state)
-            # self.q  = self.v = valuenet(self.state).item()
             self.q  = valuenet(self.state).item()
             self.nn = torch.ones(Env.board_sz, device=self.tensor_dev)
             self.qn = torch.zeros(Env.board_sz, device=self.tensor_dev)
-            # self.p_real = self.p.clone().detach().to(self.tensor_dev).squeeze_(0)
-            self.p_real = policynet(self.state).squeeze_(0)
-            if self.p_real.device != self.tensor_dev:
-                self.p_real = self.p_real.to(self.tensor_dev)
+            # self.p_real = policynet(self.state).squeeze_(0)
+            self.p_real = nn.functional.softmax(policynet(self.state).squeeze_(0), dim=0)
             # self.legal  = torch.ones(Env.board_sz, device=self.tensor_dev)
             for i in range(0, Env.board_shape[0]):
                 for j in range(0, Env.board_shape[1]):
@@ -58,6 +54,8 @@ class MCTS_node():
                         self.qn[index] = -1
                     else: self.nodes[index] = MCTS_node()
             self.p_real *= (self.c_puct / torch.sum(self.p_real))
+            if self.p_real.device != self.tensor_dev:
+                self.p_real = self.p_real.to(self.tensor_dev)
             # print(self.p_real)
 
     def select_node(self, self_play):
@@ -99,17 +97,21 @@ class MCTS_node():
             self.nn[index] += 1
         return -q_new if calc_tot == 1 else self.q # 返回本次search获得的价值
         
-    def choose_action(self, self_play = False):
+    def choose_action(self, board:Board, self_play = False):
         dis = self.nn - 1
         # 自学习时，加入狄利克雷噪声
-        if self_play:
+        if self_play and board.n < 30:
             noise = torch.distributions.dirichlet.Dirichlet(\
                      torch.ones(Env.board_sz, device=self.tensor_dev)*self.diri_alpha).sample()
             noise = torch.where(self.p_real != 0, noise\
                 , torch.zeros(Env.board_sz, device=self.tensor_dev))
             dis += ((self.diri_ratio/(1-self.diri_ratio)) * torch.sum(dis)\
                  / torch.sum(noise)) * noise
-        sample = torch.multinomial(dis, 1).item()
+
+        if self_play:
+            sample = torch.multinomial(dis, 1).item()
+        else:
+            sample = torch.argmax(dis).item()
         x, y = self.index_to_coord(sample)
         subtree = self.nodes[sample]
         return x, y, subtree, dis
@@ -152,12 +154,12 @@ class GomokuAI(Player):
     def start_play(self): 
         self.root = MCTS_node()
 
-    def next_action(self, sec = 0, calc_tot = 100): 
+    def next_action(self, sec = 0, calc_tot = 200): 
         # t1 = time.process_time()
         with torch.no_grad():
             self.root.search(self.board, self.policynet, self.valuenet\
                 , self.model_device, calc_tot, self.self_play)
-            x, y, subtree, dis = self.root.choose_action()
+            x, y, subtree, dis = self.root.choose_action(self.board, self.self_play)
             if self.self_play:
                 self.state_seq.append(self.root.state.squeeze_(0).to(MCTS_node.tensor_dev))
                 self.target_seq.append((dis/torch.sum(dis)\
