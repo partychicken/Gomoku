@@ -99,6 +99,8 @@ def train(policynet:nn.Module, valuenet:nn.Module):
     ...
 
 if __name__ == '__main__':
-    policynet, valuenet = default_net()
-    train(policynet, valuenet)
-    save_default_net(policynet, valuenet)
+    for i in range(1, 101):
+        policynet, valuenet = default_net()
+        train(policynet, valuenet)
+        save_default_net(policynet, valuenet)
+        print("Finish train {}".format(i))

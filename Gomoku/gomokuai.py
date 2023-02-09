@@ -49,6 +49,7 @@ class MCTS_node():
                     if board.get(i, j) != -1:
                         self.legal[i*Env.board_shape[0]+j] = 0
                         self.p_real[i*Env.board_shape[0]+j] = 0
+                        self.qn[i*Env.board_shape[0]+j] = -2
                     else: self.nodes[i*Env.board_shape[0]+j] = MCTS_node()
             self.p_real *= (self.c_puct / torch.sum(self.p_real))
             # print(self.p_real)

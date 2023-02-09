@@ -6,8 +6,8 @@ from torchvision import models
 from board import Board
 
 class Env:
-    device      = torch.device('cuda')
-    # device      = torch.device('cpu')
+    # device      = torch.device('cuda')
+    device      = torch.device('cpu')
     board_shape = (9, 9)
     board_sz    = board_shape[0]*board_shape[1]
     net_suffix  = '_'+str(board_shape[0])+'x'+str(board_shape[1])+'.pt'

@@ -259,8 +259,8 @@ if __name__ == '__main__':
     # board[6][7] = 1
     # p0, p1 = Person('Alice'), Person('Bob')
     p0 = GomokuAI('Alice')
-    p1 = GomokuAI('Bob')
+    # p1 = GomokuAI('Bob')
     # p0 = Person('Alice')
-    # p1 = Person('Bob')
+    p1 = Person('Bob')
     g = GomokuUI(p0, p1, NoForbidden, board)
     g.draw_ui()
