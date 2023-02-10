@@ -13,9 +13,10 @@ class Env:
     net_suffix  = '_'+str(board_shape[0])+'x'+str(board_shape[1])+'.pt'
 
     # train parameter
-    datapool_sz = 1024
-    batch_sz    = 64
-    epochs      = 10
+    tot_datapool_sz = 1024*6 # 包括本地数据在内的总数据池容量
+    datapool_sz = 1024     # 本次生成的最少数据量
+    batch_sz    = 128
+    epochs      = 8
     num_workers = 0
 
 def board_to_tensor(board:Board, device = None, unsqueeze = True):

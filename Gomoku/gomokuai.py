@@ -100,7 +100,7 @@ class MCTS_node():
     def choose_action(self, board:Board, self_play = False):
         dis = self.nn - 1
         # 自学习时，加入狄利克雷噪声
-        if self_play and board.n < 30:
+        if self_play and board.n < 6:
             noise = torch.distributions.dirichlet.Dirichlet(\
                      torch.ones(Env.board_sz, device=self.tensor_dev)*self.diri_alpha).sample()
             noise = torch.where(self.p_real != 0, noise\
@@ -154,7 +154,7 @@ class GomokuAI(Player):
     def start_play(self): 
         self.root = MCTS_node()
 
-    def next_action(self, sec = 0, calc_tot = 200): 
+    def next_action(self, sec = 0, calc_tot = 300): 
         # t1 = time.process_time()
         with torch.no_grad():
             self.root.search(self.board, self.policynet, self.valuenet\
@@ -162,7 +162,7 @@ class GomokuAI(Player):
             x, y, subtree, dis = self.root.choose_action(self.board, self.self_play)
             if self.self_play:
                 self.state_seq.append(self.root.state.squeeze_(0).to(MCTS_node.tensor_dev))
-                self.target_seq.append((dis/torch.sum(dis)\
+                self.target_seq.append((torch.log(dis/torch.sum(dis)+1e-7)\
                     , torch.tensor([self.root.q], device=MCTS_node.tensor_dev)))
         # t2 = time.process_time()
         # print('use time', (t2-t1)*1000)
