@@ -64,11 +64,11 @@ class MCTS_node():
         u = (self.p_real * sqrt(self.n)).div(self.nn)
         puct = self.qn + u
         index = torch.argmax(puct).item()
-        # if index not in self.nodes:
-        #     print(self.p_real)
-        #     print(u)
-        #     print(self.qn)
-        #     print(puct)
+        if index not in self.nodes:
+            print(self.p_real)
+            print(u)
+            print(self.qn)
+            print(puct)
         return index
 
     def search(self, board:Board, policynet:nn.Module, valuenet:nn.Module, \
@@ -154,7 +154,7 @@ class GomokuAI(Player):
     def start_play(self): 
         self.root = MCTS_node()
 
-    def next_action(self, sec = 0, calc_tot = 300): 
+    def next_action(self, sec = 0, calc_tot = 100): 
         # t1 = time.process_time()
         with torch.no_grad():
             self.root.search(self.board, self.policynet, self.valuenet\
@@ -162,7 +162,7 @@ class GomokuAI(Player):
             x, y, subtree, dis = self.root.choose_action(self.board, self.self_play)
             if self.self_play:
                 self.state_seq.append(self.root.state.squeeze_(0).to(MCTS_node.tensor_dev))
-                self.target_seq.append((torch.log(dis/torch.sum(dis)+1e-7)\
+                self.target_seq.append((dis/torch.sum(dis)\
                     , torch.tensor([self.root.q], device=MCTS_node.tensor_dev)))
         # t2 = time.process_time()
         # print('use time', (t2-t1)*1000)
