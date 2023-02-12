@@ -252,15 +252,16 @@ class GomokuUI:
         self.root.mainloop()
 
 if __name__ == '__main__':
+    # os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
     board = Board(Env.board_shape[0], Env.board_shape[1])
     # board[4][4] = 1
     # board[7][6] = 0
     # board[7][7] = 0
     # board[6][7] = 1
     # p0, p1 = Person('Alice'), Person('Bob')
-    p0 = GomokuAI('Alice')
-    # p1 = GomokuAI('Bob')
+    p0 = GomokuAI('Alice', model_device=Env.device)
+    p1 = GomokuAI('Bob', model_device=Env.device)
     # p0 = Person('Alice')
-    p1 = Person('Bob')
+    # p1 = Person('Bob')
     g = GomokuUI(p0, p1, NoForbidden, board)
     g.draw_ui()
