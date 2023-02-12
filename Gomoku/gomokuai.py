@@ -64,11 +64,11 @@ class MCTS_node():
         u = (self.p_real * sqrt(self.n)).div(self.nn)
         puct = self.qn + u
         index = torch.argmax(puct).item()
-        # if index not in self.nodes:
-        #     print(self.p_real)
-        #     print(u)
-        #     print(self.qn)
-        #     print(puct)
+        if index not in self.nodes:
+            print(self.p_real)
+            print(u)
+            print(self.qn)
+            print(puct)
         return index
 
     def search(self, board:Board, policynet:nn.Module, valuenet:nn.Module, \
@@ -100,7 +100,7 @@ class MCTS_node():
     def choose_action(self, board:Board, self_play = False):
         dis = self.nn - 1
         # 自学习时，加入狄利克雷噪声
-        if self_play and board.n < 30:
+        if self_play and board.n < 6:
             noise = torch.distributions.dirichlet.Dirichlet(\
                      torch.ones(Env.board_sz, device=self.tensor_dev)*self.diri_alpha).sample()
             noise = torch.where(self.p_real != 0, noise\
@@ -154,7 +154,7 @@ class GomokuAI(Player):
     def start_play(self): 
         self.root = MCTS_node()
 
-    def next_action(self, sec = 0, calc_tot = 200): 
+    def next_action(self, sec = 0, calc_tot = 100): 
         # t1 = time.process_time()
         with torch.no_grad():
             self.root.search(self.board, self.policynet, self.valuenet\

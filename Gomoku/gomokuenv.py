@@ -13,9 +13,10 @@ class Env:
     net_suffix  = '_'+str(board_shape[0])+'x'+str(board_shape[1])+'.pt'
 
     # train parameter
-    datapool_sz = 1024
-    batch_sz    = 64
-    epochs      = 10
+    tot_datapool_sz = 1024*6 # 包括本地数据在内的总数据池容量
+    datapool_sz = 128     # 本次生成的最少数据量
+    batch_sz    = 128
+    epochs      = 8
     num_workers = 0
 
 def board_to_tensor(board:Board, device = None, unsqueeze = True):
@@ -50,5 +51,16 @@ def default_net(device = None):
     return policynet, valuenet
 
 def save_default_net(policynet:nn.Module, valuenet:nn.Module):
+    os.chdir(os.path.dirname(__file__))
+    if not os.path.exists('./model/'):
+        os.makedirs('./model/')
+    if os.path.exists('./model/policynet'+Env.net_suffix):
+        if os.path.exists('./model/policynet'+Env.net_suffix+'.tmp'):
+            os.remove('./model/policynet'+Env.net_suffix+'.tmp')
+        os.rename('./model/policynet'+Env.net_suffix, './model/policynet'+Env.net_suffix+'.tmp')
+    if os.path.exists('./model/valuenet'+Env.net_suffix):
+        if os.path.exists('./model/valuenet'+Env.net_suffix+'.tmp'):
+            os.remove('./model/valuenet'+Env.net_suffix+'.tmp')
+        os.rename('./model/valuenet'+Env.net_suffix, './model/valuenet'+Env.net_suffix+'.tmp')
     torch.save(policynet.state_dict(), './model/policynet'+Env.net_suffix)
     torch.save(valuenet.state_dict(), './model/valuenet'+Env.net_suffix)
